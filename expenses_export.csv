@@ -1,0 +1,18 @@
+Date,Description,Payer,Amount,Beneficiaries
+2024-02-10,Groceries,Aisha,1500,All
+2024-02-12,Internet,Rohan,1000,All
+2024-02-14,Dinner,Priya,2000,All
+2024-02-15,  Groceries ,Aisha, 1500 ,All
+2024-02-30,Invalid Date Groceries,Aisha,500,All
+2024-03-05,Electricity,Rohna,1200,All
+2024-03-10,Meera payback to Rohan,Meera,500,Rohan
+2024-03-15,Trip Flight (USD),Priya,200,All
+2024-03-16,Trip Hotel (USD),Priya,300,All
+2024-03-18,Trip Food (USD),Rohan,150,All
+2024-04-10,New Microwave,Meera,4000,All
+2024-04-20,Groceries,Sam,Rs 1200,All
+2024-04-25,Water,Aisha,-500,All
+2024-05-01,Netflix,Unknown,800,All
+2024-05-05,Cleaning,,500,All
+,,,,
+2024-05-10,Internet,Rohan,1000,Sam;Meera
