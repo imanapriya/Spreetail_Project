@@ -14,32 +14,33 @@ async function main() {
     { name: 'Kabir', passcode: '1234' }
   ];
 
-  for (const r of roommates) {
-    const existing = await prisma.user.findUnique({
-      where: { name: r.name }
+  for (const roommate of roommates) {
+    await prisma.user.upsert({
+      where: { name: roommate.name },
+      update: {},
+      create: roommate
     });
 
-    if (!existing) {
-      await prisma.user.create({
-        data: r
-      });
-      console.log(`Created roommate: ${r.name}`);
-    } else {
-      console.log(`Roommate already exists: ${r.name}`);
-    }
+    console.log(`Checked roommate: ${roommate.name}`);
   }
 
-  console.log('Seed check complete.');
   const dbUsers = await prisma.user.findMany();
-  console.log('Active Roommates:', dbUsers.map(u => u.name).join(', '));
+
+  console.log('Seed completed.');
+  console.log(`Total users: ${dbUsers.length}`);
+  console.log(
+    'Active Roommates:',
+    dbUsers.map((u) => u.name).join(', ')
+  );
 }
 
 main()
-  .catch(e => {
+  .catch((e) => {
     console.error('Seed error:', e);
     process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();
   });
+
 
