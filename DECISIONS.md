@@ -1,21 +1,34 @@
-# Decision Log
+# Design Decision Log
 
-1. **Framework Choice**: Next.js App Router
-   * *Options considered*: Express/React, Vite, Next.js.
-   * *Decision*: Next.js was chosen because it allows seamless integration of backend APIs and frontend React components without maintaining two separate repositories, speeding up deployment and reducing complexity.
+This log documents the key engineering decisions, options considered, and rationales for the architecture and product design of the Shared Expenses App.
 
-2. **Database Choice**: SQLite with Prisma
-   * *Options considered*: PostgreSQL, MongoDB, SQLite.
-   * *Decision*: SQLite provides zero-configuration local persistence, which is ideal for a flat expenses app that does not require massive horizontal scaling. Prisma simplifies database interactions through type-safe schemas.
+---
 
-3. **Currency Conversion Logic**: Time-of-Import vs Real-time
-   * *Options considered*: Keeping multiple currency columns, querying live APIs for exchange rates, or locking a fixed rate during ingestion.
-   * *Decision*: Locked a static `EXCHANGE_RATE` at the point of ingestion (import script) to avoid complex multi-currency arithmetic in the views, while preserving the `originalAmt` and `currency` in the database for auditing purposes.
+### 1. Framework: Next.js App Router (React + TS)
+- **Options considered**: Express.js + Vite SPA, Next.js.
+- **Decision**: Next.js App Router. It allows fullstack server-side APIs (App Router endpoints) and React client pages in a single repository. This simplified deploying and sharing type signatures between front and back.
 
-4. **Balance Resolution Algorithm**: Net Balances
-   * *Options considered*: Mapping every exact expense to the person who paid it, vs pooling debts.
-   * *Decision*: Used a pooled Net Balance approach. It calculates what each person inherently owes vs what they paid. If positive, they owe the group. A greedy simplification algorithm calculates the exact path of payouts to ensure "Everyone is settled up" with the minimum number of transactions.
+### 2. Database: SQLite with Prisma ORM
+- **Options considered**: PostgreSQL, MongoDB, SQLite.
+- **Decision**: SQLite. Perfect for local dev environments and serverless deployments (such as Vercel + SQLite or simple self-contained deployments). Prisma ORM provides type-safety, automatic migration generation, and transaction rollback protection.
 
-5. **Anomaly Handling**: Soft-Skips vs Hard Fails
-   * *Options considered*: Crashing the script when encountering an error vs logging it and continuing.
-   * *Decision*: Soft-skips were used. The ingestion script never crashes. Instead, it creates an `ImportAnomaly` database record documenting exactly what data failed or was corrected, and the action taken. This serves as the Import Report.
+### 3. Roommate Passcode Auth (Login Module)
+- **Options considered**: Full Firebase/Auth0 OAuth, NextAuth, or Roommate Passcode-based cookie sessions.
+- **Decision**: Roommate Passcode sessions. Roommates select their name from a dropdown and input a 4-digit passcode (seeded as `1234`). We set a secure, HTTP-only cookie with the user ID. This is simple, high-performance, requires no external accounts, and secures the API endpoints in a shared roommate environment.
+
+### 4. Group-Based Membership Timelines (Sam & Meera's Requests)
+- **Options considered**: Global user join/leave dates, or a dynamic `GroupMember` link table storing `joinedAt` and `leftAt` dates per group.
+- **Decision**: Dynamic `GroupMember` timelines. Storing the date range in the link table allows a roommate's membership to be group-specific. If Meera was in the "Flat Expenses" group until March 31, 2026, and Sam joined April 15, 2026, the balance engine automatically filters their split eligibility by comparing the expense date against these boundaries. This satisfies both Sam's and Meera's timeline requests.
+
+### 5. Interactive In-App Import Queue (Meera's Request)
+- **Options considered**: CLI auto-migration, silent backend guess, or frontend Interactive Review Wizard.
+- **Decision**: **Interactive Review Wizard**. Instead of importing immediately, the app parses the CSV and surfaces anomalies in the UI. For duplicates (Meera's request), it displays them side-by-side and lets the user choose which to delete or keep. For missing fields (like missing payers or ambiguous dates), it allows inline correction in the UI. This keeps the user in control of database changes.
+
+### 6. Currency Conversion Policy (Priya's Request)
+- **Options considered**: Dual currency bookkeeping in all tables, or automatic conversion to a base currency (INR) at ingestion.
+- **Decision**: Conversion at ingestion with dual auditing. We convert USD to INR using a locked exchange rate of 1 USD = 83 INR. To satisfy Priya's request for verification, we store both the `amount` (INR) and `originalAmt` + `currency` (USD) in the schema so that roommates can verify the exact conversion logic in Rohan's breakdown modal.
+
+### 7. Net Debt Simplification Algorithm (Aisha's & Rohan's Requests)
+- **Options considered**: Direct peer-to-peer tracking (e.g. 15 separate transactions) or Greedy Debt Simplification.
+- **Decision**: **Greedy Debt Simplification**. We compute the net credit/debit for each roommate (Aisha's Request: "one number per person"). We then sort debtors and creditors and greedily match them to minimize the total number of payback transactions. To satisfy Rohan's request for audit verification, clicking a roommate's balance opens a modal containing the list of every exact expense and share that composed their balance.
+
