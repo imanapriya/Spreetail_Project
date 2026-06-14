@@ -1,15 +1,44 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
-
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const users = await prisma.user.findMany();
-    const expenses = await prisma.expense.findMany({ include: { shares: true } });
-    const settlements = await prisma.settlement.findMany();
+    const { searchParams } = new URL(request.url);
+    let groupId = searchParams.get('groupId');
 
-    // Calculate net balances for each user
+    // If no groupId is provided, default to the first group in the system
+    if (!groupId) {
+      const firstGroup = await prisma.group.findFirst();
+      if (!firstGroup) {
+        return NextResponse.json({
+          transactions: [],
+          breakdown: [],
+          groups: []
+        });
+      }
+      groupId = firstGroup.id;
+    }
+
+    const allGroups = await prisma.group.findMany({ orderBy: { name: 'asc' } });
+    
+    // Fetch members of this specific group
+    const groupMembers = await prisma.groupMember.findMany({
+      where: { groupId },
+      include: { user: true }
+    });
+    const users = groupMembers.map(gm => gm.user);
+    const userMap = new Map(users.map(u => [u.id, u]));
+
+    // Fetch expenses and settlements for this group
+    const expenses = await prisma.expense.findMany({
+      where: { groupId },
+      include: { shares: true }
+    });
+    const settlements = await prisma.settlement.findMany({
+      where: { groupId }
+    });
+
+    // Calculate net balances for each user in the group
     // positive = user owes money to the group
     // negative = group owes user money
     const balances: Record<string, number> = {};
@@ -18,7 +47,9 @@ export async function GET() {
     // 1. Add their shares (amount they owe)
     for (const exp of expenses) {
       for (const share of exp.shares) {
-        balances[share.userId] += share.amountOwed;
+        if (balances[share.userId] !== undefined) {
+          balances[share.userId] += share.amountOwed;
+        }
       }
       // 2. Subtract what they paid
       if (balances[exp.payerId] !== undefined) {
@@ -37,9 +68,9 @@ export async function GET() {
       balances[k] = Math.round(balances[k] * 100) / 100;
     });
 
-    // Simplify debts
-    const debtors = [];
-    const creditors = [];
+    // Simplify debts (Greedy Settlement Simplification)
+    const debtors: { userId: string; amount: number }[] = [];
+    const creditors: { userId: string; amount: number }[] = [];
 
     for (const userId of Object.keys(balances)) {
       const b = balances[userId];
@@ -60,8 +91,8 @@ export async function GET() {
 
       const amount = Math.min(debtor.amount, creditor.amount);
       transactions.push({
-        from: users.find(u => u.id === debtor.userId)?.name,
-        to: users.find(u => u.id === creditor.userId)?.name,
+        from: userMap.get(debtor.userId)?.name,
+        to: userMap.get(creditor.userId)?.name,
         amount: Math.round(amount * 100) / 100
       });
 
@@ -72,7 +103,7 @@ export async function GET() {
       if (creditor.amount < 0.01) j++;
     }
 
-    // Prepare detailed breakdown per user
+    // Prepare detailed breakdown per user (Rohan's Request)
     const breakdown = users.map(u => {
       const userExpenses = expenses.filter(e => e.payerId === u.id);
       const userShares = expenses.filter(e => e.shares.some(s => s.userId === u.id)).map(e => {
@@ -98,10 +129,13 @@ export async function GET() {
 
     return NextResponse.json({
       transactions,
-      breakdown
+      breakdown,
+      groups: allGroups,
+      selectedGroupId: groupId
     });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: 'Failed to fetch balances' }, { status: 500 });
   }
 }
+
