@@ -2,16 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Seeding database roommates...');
-
-  // Truncate tables in dependency order to avoid foreign key constraint errors
-  await prisma.expenseShare.deleteMany();
-  await prisma.expense.deleteMany();
-  await prisma.settlement.deleteMany();
-  await prisma.groupMember.deleteMany();
-  await prisma.group.deleteMany();
-  await prisma.importAnomaly.deleteMany();
-  await prisma.user.deleteMany();
+  console.log('Seeding database roommates (non-destructive)...');
 
   const roommates = [
     { name: 'Aisha', passcode: '1234' },
@@ -24,14 +15,23 @@ async function main() {
   ];
 
   for (const r of roommates) {
-    await prisma.user.create({
-      data: r
+    const existing = await prisma.user.findUnique({
+      where: { name: r.name }
     });
+
+    if (!existing) {
+      await prisma.user.create({
+        data: r
+      });
+      console.log(`Created roommate: ${r.name}`);
+    } else {
+      console.log(`Roommate already exists: ${r.name}`);
+    }
   }
 
-  console.log('Seed completed. Roommates loaded:');
+  console.log('Seed check complete.');
   const dbUsers = await prisma.user.findMany();
-  console.log(dbUsers.map(u => u.name).join(', '));
+  console.log('Active Roommates:', dbUsers.map(u => u.name).join(', '));
 }
 
 main()
@@ -42,3 +42,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+
