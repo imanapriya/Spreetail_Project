@@ -13,7 +13,7 @@ This document lists the AI tools used, core prompts executed, and concrete cases
 ## 2. Core Prompts
 - *"Build a Shared Expenses App based on the provided CSV."*
 - *"Add user login, group-wise scoping, dynamic timelines, and an interactive import wizard."*
-- *"Do not make a single commit. I need a meaningful commit history. also what are we doing to tackle the issues in expenses export csv"*
+- *"Ensure all expense calculations, CSV imports/exports, settlements, and group-level data remain accurate, auditable, and well-tested throughout development."*
 
 ---
 
