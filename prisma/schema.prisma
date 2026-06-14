@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id              String   @id @default(uuid())
+  name            String   @unique
+  moveInDate      DateTime?
+  moveOutDate     DateTime?
+  
+  expensesPaid    Expense[] @relation("Payer")
+  expensesOwed    ExpenseShare[]
+  
+  settlementsPaid Settlement[] @relation("SettlementPayer")
+  settlementsRcvd Settlement[] @relation("SettlementPayee")
+}
+
+model Expense {
+  id           String   @id @default(uuid())
+  date         DateTime
+  description  String
+  amount       Float    
+  currency     String   @default("INR")
+  originalAmt  Float?   
+  payerId      String
+  splitType    String   @default("equal")
+  splitDetails String?
+  notes        String?
+  payer        User     @relation("Payer", fields: [payerId], references: [id])
+  
+  shares       ExpenseShare[]
+}
+
+model ExpenseShare {
+  id          String  @id @default(uuid())
+  expenseId   String
+  userId      String
+  amountOwed  Float
+  
+  expense     Expense @relation(fields: [expenseId], references: [id])
+  user        User    @relation(fields: [userId], references: [id])
+}
+
+model Settlement {
+  id          String   @id @default(uuid())
+  date        DateTime
+  payerId     String
+  payeeId     String
+  amount      Float
+  
+  payer       User     @relation("SettlementPayer", fields: [payerId], references: [id])
+  payee       User     @relation("SettlementPayee", fields: [payeeId], references: [id])
+}
+
+model ImportAnomaly {
+  id           String   @id @default(uuid())
+  rowData      String
+  description  String
+  actionTaken  String
+  createdAt    DateTime @default(now())
+}
